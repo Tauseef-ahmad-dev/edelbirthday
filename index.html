@@ -226,37 +226,72 @@ h1,h2,p{margin-top:0}
   $('musicToggle').setAttribute('aria-label','Play birthday music');
  });
  const canvas = $('sky'), ctx = canvas.getContext('2d');
- let w=0,h=0,dpr=1,particles=[],raf=0;
+ let w=0,h=0,dpr=1,particles=[],rockets=[],raf=0;
+ const fireworkColors=['#ff83bd','#ffd58a','#fff4f7','#cfa6ff','#ffb5d4','#9fe8e4'];
  function resize(){
-  dpr=Math.min(devicePixelRatio||1,2);w=canvas.clientWidth;h=canvas.clientHeight;
+  dpr=Math.min(devicePixelRatio||1,1.75);w=canvas.clientWidth;h=canvas.clientHeight;
   canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);
  }
  addEventListener('resize',resize,{passive:true});resize();
- function burst(x=w*.5,y=h*.3,count=95){
-  const colors=['#ff83bd','#ffd58a','#ffffff','#cfa6ff','#ffb5d4'];
+ function burst(x=w*.5,y=h*.3,count=145,shape='circle'){
+  const color=fireworkColors[Math.floor(Math.random()*fireworkColors.length)];
   for(let i=0;i<count;i++){
-   const a=Math.random()*Math.PI*2,s=1.1+Math.random()*4;
-   particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:45+Math.random()*45,max:90,size:1+Math.random()*2.4,color:colors[Math.floor(Math.random()*colors.length)]});
+   let a,s;
+   if(shape==='heart'){
+    const t=(i/count)*Math.PI*2;
+    const hx=16*Math.pow(Math.sin(t),3),hy=-(13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t));
+    const tx=hx*.2,ty=hy*.2,len=Math.hypot(tx,ty)||1;
+    a=Math.atan2(ty,tx);s=(len/3.4)*(0.8+Math.random()*.25);
+   }else{
+    a=Math.random()*Math.PI*2;
+    s=shape==='ring'?2.5+Math.random()*.45:1.4+Math.random()*4.8;
+   }
+   const c=Math.random()<.48?color:fireworkColors[Math.floor(Math.random()*fireworkColors.length)];
+   const life=72+Math.random()*55;
+   particles.push({x,y,px:x,py:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life,max:life,size:.9+Math.random()*2.2,color:c,twinkle:Math.random()});
   }
-  if(particles.length>650)particles=particles.slice(-650);
+  if(particles.length>1350)particles.splice(0,particles.length-1350);
+ }
+ function launch(x,y,targetY){
+  rockets.push({x,y,targetY,vy:-5.5-Math.random()*1.8,trail:[],color:fireworkColors[Math.floor(Math.random()*fireworkColors.length)]});
  }
  function frame(){
   ctx.clearRect(0,0,w,h);
+  for(let i=rockets.length-1;i>=0;i--){
+   const r=rockets[i];r.trail.push({x:r.x,y:r.y});if(r.trail.length>9)r.trail.shift();
+   r.y+=r.vy;r.vy+=.045;
+   ctx.beginPath();ctx.moveTo(r.x,r.y);
+   for(const t of r.trail)ctx.lineTo(t.x,t.y);
+   ctx.strokeStyle=r.color;ctx.lineWidth=2;ctx.shadowBlur=13;ctx.shadowColor=r.color;ctx.stroke();
+   ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(r.x,r.y,2.2,0,Math.PI*2);ctx.fill();
+   if(r.y<=r.targetY||r.vy>=-.3){
+    const x=r.x,y=r.y;burst(x,y,155);
+    if(Math.random()<.65)setTimeout(()=>burst(x,y,65,'ring'),100);
+    rockets.splice(i,1);
+   }
+  }
   particles=particles.filter(p=>p.life>0);
   for(const p of particles){
-   p.x+=p.vx;p.y+=p.vy;p.vx*=.985;p.vy=p.vy*.985+.018;p.life--;
-   ctx.globalAlpha=Math.min(1,p.life/22)*(p.life/p.max);
-   ctx.fillStyle=p.color;ctx.shadowBlur=10;ctx.shadowColor=p.color;
-   ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();
+   p.px=p.x;p.py=p.y;p.x+=p.vx;p.y+=p.vy;p.vx*=.986;p.vy=p.vy*.986+.025;p.life--;
+   ctx.globalAlpha=Math.min(1,p.life/18)*(p.life/p.max);
+   ctx.strokeStyle=p.color;ctx.lineWidth=p.size*.85;ctx.shadowBlur=8;ctx.shadowColor=p.color;
+   ctx.beginPath();ctx.moveTo(p.px,p.py);ctx.lineTo(p.x,p.y);ctx.stroke();
+   if(p.twinkle>.45&&p.life%7===0){
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(p.x,p.y,p.size*.8,0,Math.PI*2);ctx.fill();
+   }
   }
   ctx.globalAlpha=1;ctx.shadowBlur=0;
   raf=requestAnimationFrame(frame);
  }
  if(!reduced)frame();
  function celebrate(){
-  const points=[[w*.23,h*.22],[w*.78,h*.25],[w*.5,h*.13]];
-  points.forEach((p,i)=>setTimeout(()=>burst(p[0],p[1],110),i*260));
+  if(reduced)return;
+  const points=[[w*.16,h*.23],[w*.83,h*.25],[w*.5,h*.13],[w*.31,h*.39],[w*.7,h*.4]];
+  points.forEach((p,i)=>setTimeout(()=>launch(p[0],h+8,p[1]),i*230));
+  setTimeout(()=>burst(w*.5,h*.22,115,'heart'),1250);
+  setTimeout(()=>burst(w*.23,h*.3,95,'ring'),1550);
+  setTimeout(()=>burst(w*.78,h*.32,95,'ring'),1780);
  }
  $('openSurprise').addEventListener('click',()=>{
   show(1);startMusic();celebrate();
